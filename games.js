@@ -2880,6 +2880,263 @@ function showWordSearchMessage(text, type) {
     setTimeout(() => messageDiv.innerHTML = '', 2000);
 }
 
+// HANGMAN GAME
+function initHangman(container) {
+    const html = `
+        <div class="game-info">
+            <h3>Hangman</h3>
+            <p>Guess the word by choosing letters. You have 6 lives!</p>
+        </div>
+        <div class="game-score">
+            Lives: <span id="hm-lives">6</span> |
+            Wrong: <span id="hm-wrong">0</span> |
+            High: <span id="hm-high">${gameEngine.getHighScore('hangman')}</span>
+        </div>
+        <div id="hm-word" style="text-align:center;font-size:28px;letter-spacing:6px;margin:10px 0;"></div>
+        <div id="hm-letters" style="display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin:10px 0;"></div>
+        <div class="game-controls">
+            <button class="game-btn" onclick="resetHangman()">New Word</button>
+        </div>
+        <div id="hm-message"></div>
+    `;
+    container.innerHTML = html;
+    initHangmanGame();
+}
+
+let hangman = { word:'', revealed:[], wrong:0, lives:6, used:new Set() };
+const HANGMAN_WORDS = ['javascript','puzzle','arcade','strategy','gaming','browser','vercel','github','matrix','omega','vector','function','variable'];
+
+function initHangmanGame() {
+    hangman.word = HANGMAN_WORDS[Math.floor(Math.random()*HANGMAN_WORDS.length)].toUpperCase();
+    hangman.revealed = Array(hangman.word.length).fill('_');
+    hangman.wrong = 0; hangman.lives = 6; hangman.used.clear();
+    renderHangman();
+}
+
+function renderHangman() {
+    document.getElementById('hm-word').textContent = hangman.revealed.join(' ');
+    document.getElementById('hm-lives').textContent = hangman.lives;
+    document.getElementById('hm-wrong').textContent = hangman.wrong;
+    const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+    const wrap = document.getElementById('hm-letters');
+    wrap.innerHTML = '';
+    letters.forEach(ch => {
+        const btn = document.createElement('button');
+        btn.className = 'game-btn';
+        btn.style.minWidth = '34px';
+        btn.textContent = ch;
+        btn.disabled = hangman.used.has(ch) || hangman.lives===0 || !hangman.revealed.includes('_');
+        btn.onclick = () => guessHangman(ch);
+        wrap.appendChild(btn);
+    });
+}
+
+function guessHangman(ch) {
+    if (hangman.used.has(ch)) return;
+    hangman.used.add(ch);
+    let hit = false;
+    for (let i=0;i<hangman.word.length;i++) {
+        if (hangman.word[i]===ch) { hangman.revealed[i]=ch; hit=true; }
+    }
+    if (!hit) { hangman.wrong++; hangman.lives--; showHangmanMessage('Wrong guess!', 'error'); }
+    else showHangmanMessage('Nice!', 'success');
+    renderHangman();
+    if (!hangman.revealed.includes('_')) {
+        showHangmanMessage(`You guessed it: ${hangman.word} 🎉`, 'success');
+        gameEngine.updateScore('hangman', Math.max(0, 100 - hangman.wrong*10));
+    } else if (hangman.lives===0) {
+        showHangmanMessage(`Out of lives! Word was ${hangman.word}`, 'error');
+    }
+}
+
+function resetHangman() { initHangmanGame(); document.getElementById('hm-message').innerHTML=''; }
+function showHangmanMessage(text, type){ const m=document.getElementById('hm-message'); m.innerHTML=`<div class="message ${type}">${text}</div>`; }
+
+// LIGHTS OUT
+function initLightsOut(container) {
+    const size = 5;
+    const html = `
+        <div class="game-info">
+            <h3>Lights Out</h3>
+            <p>Click tiles to toggle them and their neighbors. Turn all tiles off.</p>
+        </div>
+        <div class="game-score">Moves: <span id="lo-moves">0</span></div>
+        <div id="lo-board" style="display:grid;grid-template-columns:repeat(${size},50px);gap:6px;justify-content:center;margin:10px auto;"></div>
+        <div class="game-controls">
+            <button class="game-btn" onclick="resetLightsOut()">Reset</button>
+            <button class="game-btn" onclick="shuffleLightsOut()">Shuffle</button>
+        </div>
+        <div id="lo-message"></div>
+    `;
+    container.innerHTML = html;
+    initLightsOutGame(size);
+}
+
+let lightsOut = { size:5, board:[], moves:0 };
+function initLightsOutGame(size){
+    lightsOut.size=size; lightsOut.moves=0; lightsOut.board=Array(size).fill().map(()=>Array(size).fill(false));
+    // shuffle a bit for a guaranteed solvable start (random toggles)
+    for(let k=0;k<size*size;k++) toggleLightsOut(Math.floor(Math.random()*size),Math.floor(Math.random()*size),true);
+    renderLightsOut();
+}
+
+function renderLightsOut(){
+    document.getElementById('lo-moves').textContent = lightsOut.moves;
+    const boardEl = document.getElementById('lo-board');
+    boardEl.innerHTML='';
+    for(let r=0;r<lightsOut.size;r++){
+        for(let c=0;c<lightsOut.size;c++){
+            const cell=document.createElement('div');
+            cell.style.cssText='width:50px;height:50px;border-radius:6px;cursor:pointer;box-shadow:inset 0 0 6px rgba(0,0,0,.2)';
+            cell.style.background = lightsOut.board[r][c] ? '#FFD54F' : '#263238';
+            cell.onclick=()=>{ toggleLightsOut(r,c); };
+            boardEl.appendChild(cell);
+        }
+    }
+}
+
+function toggleLightsOut(r,c,isShuffle=false){
+    const dirs=[[0,0],[1,0],[-1,0],[0,1],[0,-1]];
+    dirs.forEach(([dr,dc])=>{
+        const nr=r+dr,nc=c+dc;
+        if(nr>=0&&nr<lightsOut.size&&nc>=0&&nc<lightsOut.size){
+            lightsOut.board[nr][nc]=!lightsOut.board[nr][nc];
+        }
+    });
+    if(!isShuffle){ lightsOut.moves++; }
+    renderLightsOut();
+    checkLightsOutWin();
+}
+
+function checkLightsOutWin(){
+    const allOff = lightsOut.board.every(row=>row.every(v=>!v));
+    if(allOff){ showLightsOutMessage('You solved it! 🎉','success'); gameEngine.updateScore('lights-out', Math.max(1, 100 - lightsOut.moves)); }
+}
+
+function resetLightsOut(){ initLightsOutGame(lightsOut.size); document.getElementById('lo-message').innerHTML=''; }
+function shuffleLightsOut(){ for(let k=0;k<lightsOut.size*lightsOut.size;k++) toggleLightsOut(Math.floor(Math.random()*lightsOut.size),Math.floor(Math.random()*lightsOut.size),true); lightsOut.moves=0; renderLightsOut(); }
+function showLightsOutMessage(text,type){ const m=document.getElementById('lo-message'); m.innerHTML=`<div class="message ${type}">${text}</div>`; }
+
+// DICE GAME
+function initDiceGame(container){
+    const html=`
+        <div class="game-info">
+            <h3>Dice Game</h3>
+            <p>Roll two dice. Try to beat your high score!</p>
+        </div>
+        <div class="game-score">Last: <span id="dg-last">-</span> | High: <span id="dg-high">${gameEngine.getHighScore('dice-game')}</span></div>
+        <div style="text-align:center;font-size:64px;margin:10px 0;" id="dg-display">🎲🎲</div>
+        <div class="game-controls">
+            <button class="game-btn" onclick="rollDiceGame()">Roll</button>
+            <button class="game-btn" onclick="resetDiceHigh()">Reset High</button>
+        </div>
+        <div id="dg-message"></div>
+    `;
+    container.innerHTML=html;
+}
+
+function rollDiceGame(){
+    const d1=1+Math.floor(Math.random()*6), d2=1+Math.floor(Math.random()*6);
+    const sum=d1+d2;
+    const faces=['','⚀','⚁','⚂','⚃','⚄','⚅'];
+    document.getElementById('dg-display').textContent = faces[d1]+faces[d2];
+    document.getElementById('dg-last').textContent = sum;
+    const isHigh = gameEngine.updateScore('dice-game', sum);
+    if(isHigh){ document.getElementById('dg-high').textContent=sum; showDiceMessage('New high score!','success'); }
+}
+function resetDiceHigh(){ gameEngine.updateScore('dice-game', 0); document.getElementById('dg-high').textContent='0'; }
+function showDiceMessage(text,type){ const m=document.getElementById('dg-message'); m.innerHTML=`<div class="message ${type}">${text}</div>`; }
+
+// COIN FLIP
+function initCoinFlip(container){
+    const html=`
+        <div class="game-info">
+            <h3>Coin Flip</h3>
+            <p>Guess heads or tails. Track your streaks!</p>
+        </div>
+        <div class="game-score">Heads: <span id="cf-heads">0</span> | Tails: <span id="cf-tails">0</span> | Streak: <span id="cf-streak">0</span></div>
+        <div style="text-align:center;font-size:80px;margin:10px 0;" id="cf-display">🪙</div>
+        <div class="game-controls">
+            <button class="game-btn" onclick="flipCoin('heads')">Guess Heads</button>
+            <button class="game-btn" onclick="flipCoin('tails')">Guess Tails</button>
+        </div>
+        <div id="cf-message"></div>
+    `;
+    container.innerHTML=html;
+    coinFlip = { heads:0, tails:0, streak:0 };
+}
+
+let coinFlip = { heads:0, tails:0, streak:0 };
+function flipCoin(guess){
+    const result = Math.random()<0.5 ? 'heads' : 'tails';
+    document.getElementById('cf-display').textContent = result==='heads'?'🙂':'🦊';
+    if(result==='heads') coinFlip.heads++; else coinFlip.tails++;
+    if(result===guess){ coinFlip.streak++; showCoinMessage('Correct!','success'); gameEngine.updateScore('coin-flip', coinFlip.streak); }
+    else { coinFlip.streak=0; showCoinMessage('Miss!','error'); }
+    document.getElementById('cf-heads').textContent=coinFlip.heads;
+    document.getElementById('cf-tails').textContent=coinFlip.tails;
+    document.getElementById('cf-streak').textContent=coinFlip.streak;
+}
+function showCoinMessage(text,type){ const m=document.getElementById('cf-message'); m.innerHTML=`<div class="message ${type}">${text}</div>`; }
+
+// REACTION TIME
+function initReactionTime(container){
+    const html=`
+        <div class="game-info">
+            <h3>Reaction Time</h3>
+            <p>Wait for green, then click as fast as you can!</p>
+        </div>
+        <div class="game-score">Best: <span id="rt-best">${gameEngine.getHighScore('reaction-time')}</span> ms</div>
+        <div id="rt-area" style="height:160px;border-radius:12px;display:flex;align-items:center;justify-content:center;color:white;font-size:20px;cursor:pointer;margin:10px 0;user-select:none;">Click Start</div>
+        <div class="game-controls">
+            <button class="game-btn" onclick="startReactionTime()">Start</button>
+        </div>
+        <div id="rt-message"></div>
+    `;
+    container.innerHTML=html;
+    reactionTime = { state:'idle', start:0, timer:null };
+    const area=document.getElementById('rt-area');
+    area.style.background='#b71c1c';
+    area.onclick = onReactionAreaClick;
+}
+
+let reactionTime = { state:'idle', start:0, timer:null };
+function startReactionTime(){
+    const area=document.getElementById('rt-area');
+    area.textContent='Wait for green...';
+    area.style.background='#b71c1c';
+    reactionTime.state='waiting';
+    const delay = 1000 + Math.random()*2000;
+    clearTimeout(reactionTime.timer);
+    reactionTime.timer = setTimeout(()=>{
+        reactionTime.state='ready';
+        reactionTime.start=performance.now();
+        area.style.background='#1b5e20';
+        area.textContent='Tap!';
+    }, delay);
+}
+
+function onReactionAreaClick(){
+    const area=document.getElementById('rt-area');
+    if(reactionTime.state==='waiting'){
+        showReactionMessage('Too soon!','error');
+        area.textContent='Click Start';
+        area.style.background='#b71c1c';
+        reactionTime.state='idle';
+        clearTimeout(reactionTime.timer);
+    } else if(reactionTime.state==='ready'){
+        const t = Math.round(performance.now()-reactionTime.start);
+        area.textContent=`${t} ms`;
+        area.style.background='#0d47a1';
+        reactionTime.state='idle';
+        const isHigh = gameEngine.updateScore('reaction-time', 10000 - t); // higher is better
+        if(isHigh){ document.getElementById('rt-best').textContent = 10000 - t; }
+        showReactionMessage(`Your time: ${t} ms`,'success');
+    }
+}
+
+function showReactionMessage(text,type){ const m=document.getElementById('rt-message'); m.innerHTML=`<div class="message ${type}">${text}</div>`; }
+
 // PONG GAME
 function initPong(container) {
     const pongHtml = `
