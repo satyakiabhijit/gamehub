@@ -1,7 +1,7 @@
 // Service Worker for GameHub
 // Provides offline functionality and caching
 
-const CACHE_NAME = 'gamehub-v1.0.0';
+const CACHE_NAME = 'gamehub-v1.0.1';
 const urlsToCache = [
     '/',
     '/index.html',
@@ -15,6 +15,7 @@ const urlsToCache = [
 
 // Install event - cache files
 self.addEventListener('install', event => {
+    self.skipWaiting();
     event.waitUntil(
         caches.open(CACHE_NAME)
             .then(cache => {
@@ -26,12 +27,41 @@ self.addEventListener('install', event => {
 
 // Fetch event - serve from cache when offline
 self.addEventListener('fetch', event => {
+    // Only handle GET
+    if (event.request.method !== 'GET') return;
+
+    const url = new URL(event.request.url);
+    const isSameOrigin = url.origin === self.location.origin;
+    const isCoreAsset = isSameOrigin && (
+        url.pathname.endsWith('.js') ||
+        url.pathname.endsWith('.css') ||
+        url.pathname.endsWith('.html') ||
+        url.pathname === '/'
+    );
+
+    if (isCoreAsset) {
+        // Network-first: ensures new deploys are visible
+        event.respondWith(
+            fetch(event.request)
+                .then(resp => {
+                    const copy = resp.clone();
+                    caches.open(CACHE_NAME).then(cache => cache.put(event.request, copy));
+                    return resp;
+                })
+                .catch(() => caches.match(event.request))
+        );
+        return;
+    }
+
+    // Cache-first for other requests (e.g., fonts, icons)
     event.respondWith(
-        caches.match(event.request)
-            .then(response => {
-                // Return cached version or fetch from network
-                return response || fetch(event.request);
-            })
+        caches.match(event.request).then(cached => {
+            return cached || fetch(event.request).then(resp => {
+                const copy = resp.clone();
+                caches.open(CACHE_NAME).then(cache => cache.put(event.request, copy));
+                return resp;
+            }).catch(() => cached);
+        })
     );
 });
 
@@ -47,6 +77,13 @@ self.addEventListener('activate', event => {
                     }
                 })
             );
-        })
+        }).then(() => self.clients.claim())
     );
+});
+
+// Allow page to send a message to activate waiting SW immediately
+self.addEventListener('message', event => {
+    if (event.data && event.data.type === 'SKIP_WAITING') {
+        self.skipWaiting();
+    }
 });
