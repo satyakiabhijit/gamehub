@@ -2880,6 +2880,550 @@ function showWordSearchMessage(text, type) {
     setTimeout(() => messageDiv.innerHTML = '', 2000);
 }
 
+// PONG GAME
+function initPong(container) {
+    const pongHtml = `
+        <div class="game-info">
+            <h3>Pong</h3>
+            <p>Use Up/Down arrow keys to move your paddle. First to 10 wins.</p>
+        </div>
+        <div class="game-score">
+            Player: <span id="pong-player">0</span> |
+            Computer: <span id="pong-ai">0</span> |
+            High: <span id="pong-high">${gameEngine.getHighScore('pong')}</span>
+        </div>
+        <canvas id="pong-canvas" width="500" height="300" class="game-canvas"></canvas>
+        <div class="game-controls">
+            <button class="game-btn" onclick="startPong()">Start</button>
+            <button class="game-btn" onclick="pausePong()">Pause</button>
+            <button class="game-btn" onclick="resetPong()">Reset</button>
+        </div>
+        <div id="pong-message"></div>
+    `;
+    container.innerHTML = pongHtml;
+    initPongGame();
+}
+
+let pong = {
+    canvas: null,
+    ctx: null,
+    player: { y: 120, h: 60, w: 10, dy: 0 },
+    ai: { y: 120, h: 60, w: 10 },
+    ball: { x: 250, y: 150, r: 6, dx: 3, dy: 2 },
+    playerScore: 0,
+    aiScore: 0,
+    loop: null,
+    running: false
+};
+
+function initPongGame() {
+    pong.canvas = document.getElementById('pong-canvas');
+    pong.ctx = pong.canvas.getContext('2d');
+    pong.playerScore = 0;
+    pong.aiScore = 0;
+    pong.player.y = (pong.canvas.height - pong.player.h) / 2;
+    pong.ai.y = (pong.canvas.height - pong.ai.h) / 2;
+    resetPongBall(-1);
+    updatePongScore();
+    drawPong();
+
+    // Controls
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowUp') { pong.player.dy = -5; e.preventDefault(); }
+        if (e.key === 'ArrowDown') { pong.player.dy = 5; e.preventDefault(); }
+    });
+    document.addEventListener('keyup', (e) => {
+        if (e.key === 'ArrowUp' || e.key === 'ArrowDown') pong.player.dy = 0;
+    });
+}
+
+function startPong() {
+    if (pong.running) return;
+    pong.running = true;
+    pong.loop = setInterval(updatePong, 1000/60);
+}
+
+function pausePong() {
+    pong.running = false;
+    if (pong.loop) { clearInterval(pong.loop); pong.loop = null; }
+}
+
+function resetPong() {
+    pausePong();
+    initPongGame();
+}
+
+function resetPongBall(direction = 1) {
+    pong.ball.x = pong.canvas ? pong.canvas.width/2 : 250;
+    pong.ball.y = pong.canvas ? pong.canvas.height/2 : 150;
+    const speed = 4;
+    pong.ball.dx = speed * direction;
+    pong.ball.dy = (Math.random() * 2 - 1) * speed * 0.5;
+}
+
+function updatePong() {
+    // Move player
+    pong.player.y += pong.player.dy;
+    pong.player.y = Math.max(0, Math.min(pong.canvas.height - pong.player.h, pong.player.y));
+
+    // Simple AI follows ball with smoothing
+    const aiCenter = pong.ai.y + pong.ai.h/2;
+    if (aiCenter < pong.ball.y - 10) pong.ai.y += 3;
+    else if (aiCenter > pong.ball.y + 10) pong.ai.y -= 3;
+    pong.ai.y = Math.max(0, Math.min(pong.canvas.height - pong.ai.h, pong.ai.y));
+
+    // Move ball
+    pong.ball.x += pong.ball.dx;
+    pong.ball.y += pong.ball.dy;
+
+    // Wall collisions
+    if (pong.ball.y - pong.ball.r < 0 || pong.ball.y + pong.ball.r > pong.canvas.height) {
+        pong.ball.dy *= -1;
+    }
+
+    // Paddle collisions
+    // Player
+    if (pong.ball.x - pong.ball.r < 20 && pong.ball.y > pong.player.y && pong.ball.y < pong.player.y + pong.player.h) {
+        pong.ball.dx = Math.abs(pong.ball.dx) * 1.05;
+        const hitPos = (pong.ball.y - (pong.player.y + pong.player.h/2)) / (pong.player.h/2);
+        pong.ball.dy = hitPos * 4;
+        pong.ball.x = 20 + pong.ball.r; // prevent sticking
+    }
+    // AI
+    if (pong.ball.x + pong.ball.r > pong.canvas.width - 20 && pong.ball.y > pong.ai.y && pong.ball.y < pong.ai.y + pong.ai.h) {
+        pong.ball.dx = -Math.abs(pong.ball.dx) * 1.05;
+        const hitPos = (pong.ball.y - (pong.ai.y + pong.ai.h/2)) / (pong.ai.h/2);
+        pong.ball.dy = hitPos * 4;
+        pong.ball.x = pong.canvas.width - 20 - pong.ball.r;
+    }
+
+    // Score check
+    if (pong.ball.x < 0) {
+        pong.aiScore++;
+        updatePongScore();
+        resetPongBall(1);
+    }
+    if (pong.ball.x > pong.canvas.width) {
+        pong.playerScore++;
+        updatePongScore();
+        resetPongBall(-1);
+    }
+
+    // Win condition
+    if (pong.playerScore >= 10 || pong.aiScore >= 10) {
+        pausePong();
+        const msg = pong.playerScore > pong.aiScore ? 'You win!' : 'Computer wins!';
+        showPongMessage(msg, pong.playerScore > pong.aiScore ? 'success' : 'error');
+        gameEngine.updateScore('pong', pong.playerScore);
+    }
+
+    drawPong();
+}
+
+function drawPong() {
+    const ctx = pong.ctx;
+    ctx.fillStyle = '#111';
+    ctx.fillRect(0, 0, pong.canvas.width, pong.canvas.height);
+
+    // Middle line
+    ctx.strokeStyle = '#333';
+    ctx.setLineDash([5, 5]);
+    ctx.beginPath();
+    ctx.moveTo(pong.canvas.width/2, 0);
+    ctx.lineTo(pong.canvas.width/2, pong.canvas.height);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Paddles
+    ctx.fillStyle = '#4CAF50';
+    ctx.fillRect(10, pong.player.y, pong.player.w, pong.player.h);
+    ctx.fillStyle = '#E91E63';
+    ctx.fillRect(pong.canvas.width - 20, pong.ai.y, pong.ai.w, pong.ai.h);
+
+    // Ball
+    ctx.fillStyle = '#fff';
+    ctx.beginPath();
+    ctx.arc(pong.ball.x, pong.ball.y, pong.ball.r, 0, Math.PI*2);
+    ctx.fill();
+}
+
+function updatePongScore() {
+    document.getElementById('pong-player').textContent = pong.playerScore;
+    document.getElementById('pong-ai').textContent = pong.aiScore;
+    const isHigh = gameEngine.updateScore('pong', pong.playerScore);
+    if (isHigh) {
+        document.getElementById('pong-high').textContent = pong.playerScore;
+    }
+}
+
+function showPongMessage(text, type) {
+    const messageDiv = document.getElementById('pong-message');
+    messageDiv.innerHTML = `<div class="message ${type}">${text}</div>`;
+}
+
+// BREAKOUT GAME
+function initBreakout(container) {
+    const html = `
+        <div class="game-info">
+            <h3>Breakout</h3>
+            <p>Break all the bricks! Move with Left/Right arrows.</p>
+        </div>
+        <div class="game-score">
+            Score: <span id="brk-score">0</span> |
+            Lives: <span id="brk-lives">3</span> |
+            High: <span id="brk-high">${gameEngine.getHighScore('breakout')}</span>
+        </div>
+        <canvas id="breakout-canvas" width="480" height="320" class="game-canvas"></canvas>
+        <div class="game-controls">
+            <button class="game-btn" onclick="startBreakout()">Start</button>
+            <button class="game-btn" onclick="pauseBreakout()">Pause</button>
+            <button class="game-btn" onclick="resetBreakout()">Reset</button>
+        </div>
+        <div id="brk-message"></div>
+    `;
+    container.innerHTML = html;
+    initBreakoutGame();
+}
+
+let breakout = {
+    canvas: null,
+    ctx: null,
+    paddle: { x: 200, y: 300, w: 80, h: 10, dx: 0 },
+    ball: { x: 240, y: 200, r: 6, dx: 3, dy: -3 },
+    bricks: [],
+    rows: 5,
+    cols: 8,
+    brickW: 50,
+    brickH: 16,
+    gap: 6,
+    offsetX: 20,
+    offsetY: 40,
+    score: 0,
+    lives: 3,
+    loop: null,
+    running: false
+};
+
+function initBreakoutGame() {
+    breakout.canvas = document.getElementById('breakout-canvas');
+    breakout.ctx = breakout.canvas.getContext('2d');
+    breakout.paddle.x = (breakout.canvas.width - breakout.paddle.w)/2;
+    breakout.paddle.y = breakout.canvas.height - 20;
+    breakout.ball.x = breakout.canvas.width/2;
+    breakout.ball.y = breakout.canvas.height - 30;
+    breakout.ball.dx = 3; breakout.ball.dy = -3;
+    breakout.score = 0;
+    breakout.lives = 3;
+    createBricks();
+    updateBreakoutHUD();
+    drawBreakout();
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowLeft') { breakout.paddle.dx = -6; }
+        if (e.key === 'ArrowRight') { breakout.paddle.dx = 6; }
+    });
+    document.addEventListener('keyup', (e) => {
+        if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') breakout.paddle.dx = 0;
+    });
+}
+
+function createBricks() {
+    breakout.bricks = [];
+    for (let r = 0; r < breakout.rows; r++) {
+        breakout.bricks[r] = [];
+        for (let c = 0; c < breakout.cols; c++) {
+            breakout.bricks[r][c] = { x: 0, y: 0, alive: true };
+        }
+    }
+}
+
+function startBreakout() {
+    if (breakout.running) return;
+    breakout.running = true;
+    breakout.loop = setInterval(updateBreakout, 1000/60);
+}
+
+function pauseBreakout() {
+    breakout.running = false;
+    if (breakout.loop) { clearInterval(breakout.loop); breakout.loop = null; }
+}
+
+function resetBreakout() {
+    pauseBreakout();
+    initBreakoutGame();
+}
+
+function updateBreakout() {
+    // Move paddle
+    breakout.paddle.x += breakout.paddle.dx;
+    breakout.paddle.x = Math.max(0, Math.min(breakout.canvas.width - breakout.paddle.w, breakout.paddle.x));
+
+    // Move ball
+    breakout.ball.x += breakout.ball.dx;
+    breakout.ball.y += breakout.ball.dy;
+
+    // Wall collisions
+    if (breakout.ball.x - breakout.ball.r < 0 || breakout.ball.x + breakout.ball.r > breakout.canvas.width) breakout.ball.dx *= -1;
+    if (breakout.ball.y - breakout.ball.r < 0) breakout.ball.dy *= -1;
+
+    // Paddle collision
+    if (breakout.ball.y + breakout.ball.r > breakout.paddle.y &&
+        breakout.ball.x > breakout.paddle.x && breakout.ball.x < breakout.paddle.x + breakout.paddle.w &&
+        breakout.ball.dy > 0) {
+        const hit = (breakout.ball.x - (breakout.paddle.x + breakout.paddle.w/2)) / (breakout.paddle.w/2);
+        breakout.ball.dy = -Math.abs(breakout.ball.dy);
+        breakout.ball.dx = hit * 5;
+    }
+
+    // Brick collisions
+    const r = Math.floor((breakout.ball.y - breakout.offsetY) / (breakout.brickH + breakout.gap));
+    const c = Math.floor((breakout.ball.x - breakout.offsetX) / (breakout.brickW + breakout.gap));
+    if (r >= 0 && r < breakout.rows && c >= 0 && c < breakout.cols) {
+        const brick = breakout.bricks[r][c];
+        if (brick && brick.alive) {
+            brick.alive = false;
+            breakout.ball.dy *= -1;
+            breakout.score += 10;
+            updateBreakoutHUD();
+            gameEngine.updateScore('breakout', breakout.score);
+        }
+    }
+
+    // Bottom collision = life lost
+    if (breakout.ball.y - breakout.ball.r > breakout.canvas.height) {
+        breakout.lives--;
+        if (breakout.lives <= 0) {
+            pauseBreakout();
+            showBreakoutMessage('Game Over!', 'error');
+            return;
+        } else {
+            // Reset ball and paddle
+            breakout.paddle.x = (breakout.canvas.width - breakout.paddle.w)/2;
+            breakout.ball.x = breakout.canvas.width/2;
+            breakout.ball.y = breakout.canvas.height - 30;
+            breakout.ball.dx = 3; breakout.ball.dy = -3;
+        }
+        updateBreakoutHUD();
+    }
+
+    // Win condition
+    const remaining = breakout.bricks.flat().filter(b => b.alive).length;
+    if (remaining === 0) {
+        pauseBreakout();
+        showBreakoutMessage('You cleared all bricks! 🎉', 'success');
+        gameEngine.updateScore('breakout', breakout.score + 100);
+    }
+
+    drawBreakout();
+}
+
+function drawBreakout() {
+    const ctx = breakout.ctx;
+    ctx.fillStyle = '#0b0b0f';
+    ctx.fillRect(0, 0, breakout.canvas.width, breakout.canvas.height);
+
+    // Bricks
+    for (let r = 0; r < breakout.rows; r++) {
+        for (let c = 0; c < breakout.cols; c++) {
+            const brick = breakout.bricks[r][c];
+            const x = breakout.offsetX + c * (breakout.brickW + breakout.gap);
+            const y = breakout.offsetY + r * (breakout.brickH + breakout.gap);
+            if (brick.alive) {
+                brick.x = x; brick.y = y;
+                ctx.fillStyle = `hsl(${(r*50 + c*10)%360} 70% 55%)`;
+                ctx.fillRect(x, y, breakout.brickW, breakout.brickH);
+            }
+        }
+    }
+
+    // Paddle
+    ctx.fillStyle = '#4CAF50';
+    ctx.fillRect(breakout.paddle.x, breakout.paddle.y, breakout.paddle.w, breakout.paddle.h);
+
+    // Ball
+    ctx.fillStyle = '#fff';
+    ctx.beginPath();
+    ctx.arc(breakout.ball.x, breakout.ball.y, breakout.ball.r, 0, Math.PI*2);
+    ctx.fill();
+}
+
+function updateBreakoutHUD() {
+    document.getElementById('brk-score').textContent = breakout.score;
+    document.getElementById('brk-lives').textContent = breakout.lives;
+    const isHigh = gameEngine.updateScore('breakout', breakout.score);
+    if (isHigh) document.getElementById('brk-high').textContent = breakout.score;
+}
+
+function showBreakoutMessage(text, type) {
+    const messageDiv = document.getElementById('brk-message');
+    messageDiv.innerHTML = `<div class="message ${type}">${text}</div>`;
+}
+
+// REVERSI (OTHELLO)
+function initReversi(container) {
+    const html = `
+        <div class="game-info">
+            <h3>Reversi (Othello)</h3>
+            <p>Place discs to flip your opponent's discs. Black goes first.</p>
+        </div>
+        <div class="game-score">
+            Black: <span id="rev-black">2</span> |
+            White: <span id="rev-white">2</span> |
+            Turn: <span id="rev-turn">Black</span>
+        </div>
+        <div id="reversi-board" style="display:grid;grid-template-columns:repeat(8,42px);gap:4px;justify-content:center;margin:10px auto;width:fit-content;"></div>
+        <div class="game-controls">
+            <button class="game-btn" onclick="resetReversi()">Reset</button>
+            <button class="game-btn" onclick="toggleReversiAI()">Toggle AI</button>
+        </div>
+        <div id="rev-message"></div>
+    `;
+    container.innerHTML = html;
+    initReversiGame();
+}
+
+let reversi = {
+    board: [], // 8x8, 0 empty, 1 black, -1 white
+    current: 1,
+    aiEnabled: true
+};
+
+const REV_DIRS = [
+    [-1,-1],[-1,0],[-1,1],
+    [0,-1],        [0,1],
+    [1,-1],[1,0],[1,1]
+];
+
+function initReversiGame() {
+    reversi.board = Array(8).fill().map(()=>Array(8).fill(0));
+    reversi.board[3][3] = -1; // W
+    reversi.board[4][4] = -1; // W
+    reversi.board[3][4] = 1;  // B
+    reversi.board[4][3] = 1;  // B
+    reversi.current = 1;
+    renderReversi();
+    updateReversiHUD();
+}
+
+function renderReversi() {
+    const boardEl = document.getElementById('reversi-board');
+    boardEl.innerHTML = '';
+    for (let r=0;r<8;r++) {
+        for (let c=0;c<8;c++) {
+            const cell = document.createElement('div');
+            cell.style.cssText = 'width:42px;height:42px;background:#2e7d32;border-radius:6px;display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;';
+            cell.dataset.r = r; cell.dataset.c = c;
+            cell.addEventListener('click', ()=>placeReversi(r,c));
+            const val = reversi.board[r][c];
+            if (val !== 0) {
+                const disc = document.createElement('div');
+                disc.style.cssText = `width:30px;height:30px;border-radius:50%;box-shadow:inset 0 0 8px rgba(0,0,0,.4);background:${val===1?'#111':'#f5f5f5'};`;
+                cell.appendChild(disc);
+            } else if (isValidReversiMove(r,c,reversi.current)) {
+                // show hint dot
+                const dot = document.createElement('div');
+                dot.style.cssText = 'width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,.6);';
+                cell.appendChild(dot);
+            }
+            boardEl.appendChild(cell);
+        }
+    }
+}
+
+function placeReversi(r,c) {
+    if (reversi.board[r][c] !== 0) return;
+    const flips = getReversiFlips(r,c,reversi.current);
+    if (flips.length === 0) return;
+    reversi.board[r][c] = reversi.current;
+    flips.forEach(([fr,fc])=> reversi.board[fr][fc] = reversi.current);
+    reversi.current *= -1;
+    renderReversi();
+    updateReversiHUD();
+
+    // If AI enabled and it's AI's turn
+    setTimeout(()=>{
+        if (reversi.aiEnabled && reversi.current === -1) {
+            aiReversiMove();
+        } else if (!hasAnyValidReversiMove(reversi.current)) {
+            // Pass turn if no moves
+            reversi.current *= -1;
+            renderReversi();
+            updateReversiHUD();
+        }
+        checkReversiEnd();
+    }, 250);
+}
+
+function getReversiFlips(r,c,player) {
+    let flips = [];
+    for (const [dr,dc] of REV_DIRS) {
+        let cr=r+dr, cc=c+dc, line=[];
+        while (cr>=0&&cr<8&&cc>=0&&cc<8 && reversi.board[cr][cc]===-player) {
+            line.push([cr,cc]);
+            cr+=dr; cc+=dc;
+        }
+        if (line.length>0 && cr>=0&&cr<8&&cc>=0&&cc<8 && reversi.board[cr][cc]===player) {
+            flips = flips.concat(line);
+        }
+    }
+    return flips;
+}
+
+function isValidReversiMove(r,c,player) {
+    if (reversi.board[r][c]!==0) return false;
+    return getReversiFlips(r,c,player).length>0;
+}
+
+function hasAnyValidReversiMove(player) {
+    for (let r=0;r<8;r++) for (let c=0;c<8;c++) if (isValidReversiMove(r,c,player)) return true;
+    return false;
+}
+
+function aiReversiMove() {
+    // Simple AI: choose move with max flips
+    let best=null, bestCount=-1;
+    for (let r=0;r<8;r++) for (let c=0;c<8;c++) {
+        const flips = getReversiFlips(r,c,-1);
+        if (flips.length>bestCount) { best={r,c,flips}; bestCount=flips.length; }
+    }
+    if (best && bestCount>0) {
+        reversi.board[best.r][best.c] = -1;
+        best.flips.forEach(([fr,fc])=> reversi.board[fr][fc] = -1);
+        reversi.current = 1;
+        renderReversi();
+        updateReversiHUD();
+    } else {
+        // pass turn
+        reversi.current = 1;
+        renderReversi();
+        updateReversiHUD();
+    }
+}
+
+function updateReversiHUD() {
+    const flat = reversi.board.flat();
+    const black = flat.filter(v=>v===1).length;
+    const white = flat.filter(v=>v===-1).length;
+    document.getElementById('rev-black').textContent = black;
+    document.getElementById('rev-white').textContent = white;
+    document.getElementById('rev-turn').textContent = reversi.current===1?'Black':'White';
+}
+
+function checkReversiEnd() {
+    const flat = reversi.board.flat();
+    if (!flat.includes(0) || (!hasAnyValidReversiMove(1) && !hasAnyValidReversiMove(-1))) {
+        const black = flat.filter(v=>v===1).length;
+        const white = flat.filter(v=>v===-1).length;
+        const msg = black>white? 'Black wins!' : (white>black? 'White wins!' : 'Draw!');
+        showReversiMessage(msg, black>=white?'success':'error');
+        gameEngine.updateScore('reversi', black);
+    }
+}
+
+function resetReversi() { initReversiGame(); }
+function toggleReversiAI() { reversi.aiEnabled = !reversi.aiEnabled; showReversiMessage(`AI ${reversi.aiEnabled?'enabled':'disabled'}`, 'success'); }
+function showReversiMessage(text, type) { const m=document.getElementById('rev-message'); m.innerHTML = `<div class="message ${type}">${text}</div>`; }
+
 // Placeholder implementations for remaining games
 const gameImplementations = [
     'initHangman', 'initWordChain', 'initNumberSequence', 'initMathMemory',
