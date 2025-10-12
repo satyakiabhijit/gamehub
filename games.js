@@ -3681,6 +3681,427 @@ function resetReversi() { initReversiGame(); }
 function toggleReversiAI() { reversi.aiEnabled = !reversi.aiEnabled; showReversiMessage(`AI ${reversi.aiEnabled?'enabled':'disabled'}`, 'success'); }
 function showReversiMessage(text, type) { const m=document.getElementById('rev-message'); m.innerHTML = `<div class="message ${type}">${text}</div>`; }
 
+// CHESS GAME
+function initChess(container) {
+    const html = `
+        <div class="game-info">
+            <h3>Chess</h3>
+            <p>Classic strategy game. Click a piece to see its legal moves. Check, checkmate, stalemate included. Castling and en passant supported. Optional AI.</p>
+        </div>
+        <div class="game-score">
+            Turn: <span id="ch-turn">White</span> |
+            Status: <span id="ch-status">Ready</span> |
+            Moves: <span id="ch-moves">0</span>
+        </div>
+        <div id="chess-board" style="display:grid;grid-template-columns:repeat(8,64px);grid-auto-rows:64px;gap:2px;justify-content:center;margin:10px auto;user-select:none;"></div>
+        <div class="game-controls">
+            <button class="game-btn" onclick="chessNewGame()">New Game</button>
+            <button class="game-btn" onclick="chessUndo()">Undo</button>
+            <button class="game-btn" onclick="chessToggleAI()">Toggle AI</button>
+        </div>
+        <div id="ch-message"></div>
+    `;
+    container.innerHTML = html;
+    initChessGame();
+}
+
+let chess;
+const CH_PIECE_UTF = {
+    wK: '♔', wQ: '♕', wR: '♖', wB: '♗', wN: '♘', wP: '♙',
+    bK: '♚', bQ: '♛', bR: '♜', bB: '♝', bN: '♞', bP: '♟'
+};
+const CH_VALUES = { K: 10000, Q: 900, R: 500, B: 330, N: 320, P: 100 };
+
+function initChessGame() {
+    chess = {
+        board: chessStartBoard(),
+        turn: 'w',
+        selected: null,
+        legal: [],
+        history: [],
+        castle: { wK: true, wQ: true, bK: true, bQ: true },
+        enPassant: null, // {r,c}
+        aiEnabled: false,
+        moveCount: 0,
+        gameOver: false
+    };
+    renderChess();
+}
+
+function chessStartBoard() {
+    // Row 0 is black back rank; row 7 is white back rank
+    return [
+        ['bR','bN','bB','bQ','bK','bB','bN','bR'],
+        ['bP','bP','bP','bP','bP','bP','bP','bP'],
+        [null,null,null,null,null,null,null,null],
+        [null,null,null,null,null,null,null,null],
+        [null,null,null,null,null,null,null,null],
+        [null,null,null,null,null,null,null,null],
+        ['wP','wP','wP','wP','wP','wP','wP','wP'],
+        ['wR','wN','wB','wQ','wK','wB','wN','wR']
+    ];
+}
+
+function renderChess() {
+    const boardEl = document.getElementById('chess-board');
+    boardEl.innerHTML = '';
+    // Render rows from 0..7 (black top, white bottom)
+    for (let r = 0; r < 8; r++) {
+        for (let c = 0; c < 8; c++) {
+            const sq = document.createElement('div');
+            const light = (r + c) % 2 === 0;
+            sq.style.cssText = `
+                width:64px;height:64px;display:flex;align-items:center;justify-content:center;
+                background:${light ? '#f0d9b5' : '#b58863'}; font-size:36px; cursor:pointer; border-radius:6px; position:relative;`;
+            sq.dataset.r = r; sq.dataset.c = c;
+            sq.addEventListener('click', () => onChessClick(r, c));
+
+            const piece = chess.board[r][c];
+            if (piece) {
+                const span = document.createElement('span');
+                span.textContent = CH_PIECE_UTF[piece];
+                span.style.filter = piece[0] === 'b' ? 'drop-shadow(0 0 2px #000)' : 'drop-shadow(0 0 1px #333)';
+                sq.appendChild(span);
+            }
+
+            // Show legal move dots
+            if (chess.selected) {
+                if (chess.legal.some(m => m.r === r && m.c === c)) {
+                    const dot = document.createElement('div');
+                    dot.style.cssText = 'position:absolute;width:14px;height:14px;border-radius:50%;background:rgba(76,175,80,0.8);';
+                    sq.appendChild(dot);
+                }
+            }
+
+            // Highlight selected square
+            if (chess.selected && chess.selected.r === r && chess.selected.c === c) {
+                sq.style.outline = '3px solid #4CAF50';
+            }
+
+            boardEl.appendChild(sq);
+        }
+    }
+    document.getElementById('ch-turn').textContent = chess.turn === 'w' ? 'White' : 'Black';
+    document.getElementById('ch-moves').textContent = chess.moveCount;
+}
+
+function onChessClick(r, c) {
+    if (chess.gameOver) return;
+    const piece = chess.board[r][c];
+    const own = piece && piece[0] === chess.turn;
+
+    if (chess.selected) {
+        // Try to move
+        const move = chess.legal.find(m => m.r === r && m.c === c);
+        if (move) {
+            chessMakeMove({ from: { ...chess.selected }, to: { r, c }, ...move.extra });
+            renderChess();
+            setTimeout(chessPostMove, 50);
+            return;
+        }
+    }
+
+    if (own) {
+        chess.selected = { r, c };
+        chess.legal = chessLegalMoves(r, c, chess.board, chess.turn, chess.castle, chess.enPassant);
+        document.getElementById('ch-status').textContent = chess.legal.length ? 'Select a destination' : 'No legal moves';
+    } else {
+        chess.selected = null; chess.legal = [];
+    }
+    renderChess();
+}
+
+function chessPostMove() {
+    // Check game state
+    const opp = chess.turn; // after move, turn has been flipped
+    const inCk = chessInCheck(opp, chess.board);
+    const hasMoves = chessAllLegalMoves(opp, chess.board, chess.castle, chess.enPassant).length > 0;
+    if (inCk && !hasMoves) {
+        document.getElementById('ch-status').textContent = 'Checkmate!';
+        chess.gameOver = true;
+        showChessMessage((opp === 'w' ? 'White' : 'Black') + ' is checkmated.');
+        gameEngine.updateScore('chess', 1);
+        return;
+    } else if (!inCk && !hasMoves) {
+        document.getElementById('ch-status').textContent = 'Stalemate';
+        chess.gameOver = true;
+        showChessMessage('Stalemate');
+        return;
+    } else if (inCk) {
+        document.getElementById('ch-status').textContent = 'Check!';
+    } else {
+        document.getElementById('ch-status').textContent = 'Your move';
+    }
+
+    // Simple AI for Black when enabled
+    if (chess.aiEnabled && chess.turn === 'b' && !chess.gameOver) {
+        setTimeout(chessAIMove, 200);
+    }
+}
+
+function chessMakeMove(move) {
+    const { from, to, promotion, castle, enPassant } = move;
+    const board = chess.board;
+    const src = board[from.r][from.c];
+    const dst = board[to.r][to.c];
+
+    const snapshot = {
+        board: JSON.parse(JSON.stringify(board)),
+        turn: chess.turn,
+        castle: { ...chess.castle },
+        enPassant: chess.enPassant,
+        moveCount: chess.moveCount
+    };
+    chess.history.push(snapshot);
+
+    // Reset en passant each move
+    chess.enPassant = null;
+
+    // Handle special: castling
+    if (castle) {
+        // Move king
+        board[to.r][to.c] = src; board[from.r][from.c] = null;
+        // Move rook depending on side
+        if (to.c === 6) { // king side
+            board[to.r][5] = board[to.r][7];
+            board[to.r][7] = null;
+        } else if (to.c === 2) { // queen side
+            board[to.r][3] = board[to.r][0];
+            board[to.r][0] = null;
+        }
+    } else {
+        // En passant capture
+        if (enPassant) {
+            board[to.r][to.c] = src; board[from.r][from.c] = null;
+            const capR = src[0] === 'w' ? to.r + 1 : to.r - 1;
+            board[capR][to.c] = null;
+        } else {
+            board[to.r][to.c] = src; board[from.r][from.c] = null;
+        }
+    }
+
+    // Pawn double step sets enPassant target
+    if (src[1] === 'P' && Math.abs(to.r - from.r) === 2) {
+        chess.enPassant = { r: (from.r + to.r) / 2, c: from.c };
+    }
+
+    // Update castling rights
+    if (src === 'wK') { chess.castle.wK = chess.castle.wQ = false; }
+    if (src === 'bK') { chess.castle.bK = chess.castle.bQ = false; }
+    if (src === 'wR') {
+        if (from.r === 7 && from.c === 0) chess.castle.wQ = false;
+        if (from.r === 7 && from.c === 7) chess.castle.wK = false;
+    }
+    if (src === 'bR') {
+        if (from.r === 0 && from.c === 0) chess.castle.bQ = false;
+        if (from.r === 0 && from.c === 7) chess.castle.bK = false;
+    }
+    // If rook captured, update opponent rights
+    if (dst === 'wR') {
+        if (to.r === 7 && to.c === 0) chess.castle.wQ = false;
+        if (to.r === 7 && to.c === 7) chess.castle.wK = false;
+    }
+    if (dst === 'bR') {
+        if (to.r === 0 && to.c === 0) chess.castle.bQ = false;
+        if (to.r === 0 && to.c === 7) chess.castle.bK = false;
+    }
+
+    // Promotion
+    if (src[1] === 'P' && (to.r === 0 || to.r === 7)) {
+        const promoteTo = promotion || 'Q';
+        board[to.r][to.c] = src[0] + promoteTo;
+    }
+
+    // Flip turn
+    chess.turn = chess.turn === 'w' ? 'b' : 'w';
+    chess.selected = null; chess.legal = [];
+    chess.moveCount++;
+}
+
+function chessLegalMoves(r, c, board, turn, castle, enPassant) {
+    const piece = board[r][c];
+    if (!piece || piece[0] !== turn) return [];
+    const type = piece[1];
+    let moves = [];
+    const add = (rr, cc, extra={}) => { if (rr>=0 && rr<8 && cc>=0 && cc<8) moves.push({ r: rr, c: cc, extra }); };
+
+    const dir = piece[0] === 'w' ? -1 : 1; // white moves up (towards r 0)
+    if (type === 'P') {
+        // forward
+        if (!board[r+dir]?.[c]) add(r+dir, c);
+        // double
+        const startRow = piece[0]==='w'?6:1;
+        if (r===startRow && !board[r+dir]?.[c] && !board[r+2*dir]?.[c]) add(r+2*dir, c, { enPassantSet: true });
+        // captures
+        for (const dc of [-1,1]) {
+            const rr=r+dir, cc=c+dc; if (rr<0||rr>=8||cc<0||cc>=8) continue;
+            const t=board[rr][cc]; if (t && t[0]!==piece[0]) add(rr,cc);
+        }
+        // en passant capture
+        if (enPassant) {
+            if (Math.abs(enPassant.c - c) === 1 && enPassant.r === r + dir) {
+                add(enPassant.r, enPassant.c, { enPassant: true });
+            }
+        }
+    }
+    if (type === 'N') {
+        const offs = [[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]];
+        for (const [dr,dc] of offs) {
+            const rr=r+dr, cc=c+dc; if (rr<0||rr>=8||cc<0||cc>=8) continue;
+            const t=board[rr][cc]; if (!t || t[0]!==piece[0]) add(rr,cc);
+        }
+    }
+    if (type === 'B' || type === 'R' || type === 'Q') {
+        const dirs = [];
+        if (type !== 'B') dirs.push([1,0],[-1,0],[0,1],[0,-1]);
+        if (type !== 'R') dirs.push([1,1],[1,-1],[-1,1],[-1,-1]);
+        for (const [dr,dc] of dirs) {
+            let rr=r+dr, cc=c+dc;
+            while(rr>=0&&rr<8&&cc>=0&&cc<8) {
+                const t=board[rr][cc];
+                if (!t) { add(rr,cc); }
+                else { if (t[0]!==piece[0]) add(rr,cc); break; }
+                rr+=dr; cc+=dc;
+            }
+        }
+    }
+    if (type === 'K') {
+        for (let dr=-1; dr<=1; dr++) for (let dc=-1; dc<=1; dc++) {
+            if (!dr && !dc) continue; const rr=r+dr, cc=c+dc;
+            if (rr<0||rr>=8||cc<0||cc>=8) continue; const t=board[rr][cc];
+            if (!t || t[0]!==piece[0]) add(rr,cc);
+        }
+        // Castling
+        if (piece[0]==='w' && r===7 && c===4) {
+            if (castle.wK && !board[7][5] && !board[7][6] && !chessSquaresInCheck(board,'w',[[7,4],[7,5],[7,6]])) add(7,6,{castle:true});
+            if (castle.wQ && !board[7][1] && !board[7][2] && !board[7][3] && !chessSquaresInCheck(board,'w',[[7,4],[7,3],[7,2]])) add(7,2,{castle:true});
+        }
+        if (piece[0]==='b' && r===0 && c===4) {
+            if (castle.bK && !board[0][5] && !board[0][6] && !chessSquaresInCheck(board,'b',[[0,4],[0,5],[0,6]])) add(0,6,{castle:true});
+            if (castle.bQ && !board[0][1] && !board[0][2] && !board[0][3] && !chessSquaresInCheck(board,'b',[[0,4],[0,3],[0,2]])) add(0,2,{castle:true});
+        }
+    }
+
+    // Filter illegal moves leaving king in check
+    const legal = [];
+    for (const m of moves) {
+        const sim = JSON.parse(JSON.stringify(board));
+        const src = sim[r][c];
+        // handle castle sim
+        if (m.extra?.castle) {
+            sim[m.r][m.c] = src; sim[r][c] = null;
+            if (m.c === 6) { sim[m.r][5] = sim[m.r][7]; sim[m.r][7] = null; }
+            if (m.c === 2) { sim[m.r][3] = sim[m.r][0]; sim[m.r][0] = null; }
+        } else if (m.extra?.enPassant) {
+            sim[m.r][m.c] = src; sim[r][c] = null;
+            const capR = src[0]==='w' ? m.r+1 : m.r-1; sim[capR][m.c] = null;
+        } else {
+            sim[m.r][m.c] = src; sim[r][c] = null;
+        }
+        if (!chessInCheck(turn, sim)) legal.push(m);
+    }
+    return legal;
+}
+
+function chessSquaresInCheck(board, color, squares) {
+    return squares.some(([r,c]) => chessSquareAttacked(board, r, c, color==='w'?'b':'w'));
+}
+
+function chessInCheck(color, board) {
+    // find king
+    for (let r=0;r<8;r++) for (let c=0;c<8;c++) {
+        if (board[r][c] === color+'K') return chessSquareAttacked(board, r, c, color==='w'?'b':'w');
+    }
+    return false;
+}
+
+function chessSquareAttacked(board, r, c, byColor) {
+    // Knights
+    const kOff = [[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]];
+    for (const [dr,dc] of kOff) {
+        const rr=r+dr, cc=c+dc; if (rr<0||rr>=8||cc<0||cc>=8) continue;
+        if (board[rr][cc] === byColor+'N') return true;
+    }
+    // Pawns
+    const dir = byColor==='w' ? -1 : 1;
+    for (const dc of [-1,1]) {
+        const rr=r+dir, cc=c+dc; if (rr<0||rr>=8||cc<0||cc>=8) continue;
+        if (board[rr][cc] === byColor+'P') return true;
+    }
+    // King
+    for (let dr=-1; dr<=1; dr++) for (let dc=-1; dc<=1; dc++) {
+        if (!dr && !dc) continue; const rr=r+dr, cc=c+dc;
+        if (rr<0||rr>=8||cc<0||cc>=8) continue;
+        if (board[rr][cc] === byColor+'K') return true;
+    }
+    // Sliding: rook/queen (orthogonal)
+    const orth = [[1,0],[-1,0],[0,1],[0,-1]];
+    for (const [dr,dc] of orth) {
+        let rr=r+dr, cc=c+dc;
+        while(rr>=0&&rr<8&&cc>=0&&cc<8) {
+            const t=board[rr][cc];
+            if (t) { if (t[0]===byColor && (t[1]==='R'||t[1]==='Q')) return true; else break; }
+            rr+=dr; cc+=dc;
+        }
+    }
+    // Sliding: bishop/queen (diagonal)
+    const diag = [[1,1],[1,-1],[-1,1],[-1,-1]];
+    for (const [dr,dc] of diag) {
+        let rr=r+dr, cc=c+dc;
+        while(rr>=0&&rr<8&&cc>=0&&cc<8) {
+            const t=board[rr][cc];
+            if (t) { if (t[0]===byColor && (t[1]==='B'||t[1]==='Q')) return true; else break; }
+            rr+=dr; cc+=dc;
+        }
+    }
+    return false;
+}
+
+function chessAllLegalMoves(color, board, castle, enPassant) {
+    let all = [];
+    for (let r=0;r<8;r++) for (let c=0;c<8;c++) {
+        if (board[r][c] && board[r][c][0]===color) {
+            all = all.concat(chessLegalMoves(r,c,board,color,castle,enPassant).map(m=>({from:{r,c},to:{r:m.r,c:m.c},extra:m.extra})));
+        }
+    }
+    return all;
+}
+
+function chessNewGame(){ initChessGame(); document.getElementById('ch-status').textContent='Ready'; document.getElementById('ch-message').innerHTML=''; }
+function chessUndo(){ if (!chess.history.length) return; const s=chess.history.pop(); chess.board=s.board; chess.turn=s.turn; chess.castle=s.castle; chess.enPassant=s.enPassant; chess.moveCount=s.moveCount; chess.gameOver=false; chess.selected=null; chess.legal=[]; renderChess(); document.getElementById('ch-status').textContent='Undid move'; }
+function chessToggleAI(){ chess.aiEnabled=!chess.aiEnabled; showChessMessage(`AI ${chess.aiEnabled?'enabled':'disabled'}`,'success'); if (chess.aiEnabled && chess.turn==='b') setTimeout(chessAIMove, 200); }
+function showChessMessage(text,type){ const m=document.getElementById('ch-message'); m.innerHTML=`<div class="message ${type}">${text}</div>`; }
+
+function chessAIMove(){
+    const moves = chessAllLegalMoves('b', chess.board, chess.castle, chess.enPassant);
+    if (moves.length===0) { chessPostMove(); return; }
+    // Greedy: prefer captures by material gain
+    let best = null; let bestScore = -1e9;
+    for (const mv of moves) {
+        const b = JSON.parse(JSON.stringify(chess.board));
+        const src = b[mv.from.r][mv.from.c];
+        let captured = 0; const dstPiece = b[mv.to.r][mv.to.c];
+        if (mv.extra?.castle) {
+            b[mv.to.r][mv.to.c]=src; b[mv.from.r][mv.from.c]=null;
+            if (mv.to.c===6) { b[mv.to.r][5]=b[mv.to.r][7]; b[mv.to.r][7]=null; }
+            else { b[mv.to.r][3]=b[mv.to.r][0]; b[mv.to.r][0]=null; }
+        } else if (mv.extra?.enPassant) {
+            b[mv.to.r][mv.to.c]=src; b[mv.from.r][mv.from.c]=null; const capR = src[0]==='w'?mv.to.r+1:mv.to.r-1; const cap=b[capR][mv.to.c]; captured = cap?CH_VALUES[cap[1]]:0; b[capR][mv.to.c]=null;
+        } else {
+            if (dstPiece) captured = CH_VALUES[dstPiece[1]];
+            b[mv.to.r][mv.to.c]=src; b[mv.from.r][mv.from.c]=null;
+        }
+        // simple evaluation = captured value - own piece value exposed (lite)
+        const score = captured + Math.random()*5;
+        if (score > bestScore) { bestScore = score; best = mv; }
+    }
+    if (best) {
+        chessMakeMove(best);
+        renderChess();
+        chessPostMove();
+    }
+}
+
 // Placeholder implementations for remaining games
 const gameImplementations = [
     'initHangman', 'initWordChain', 'initNumberSequence', 'initMathMemory',
