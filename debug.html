@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Test</title>
+    <style>
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 2000;
+        }
+        .modal-content {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            width: 400px;
+            height: 300px;
+        }
+        .game-card {
+            border: 1px solid #ccc;
+            padding: 20px;
+            margin: 10px;
+            cursor: pointer;
+            border-radius: 5px;
+        }
+        .game-card:hover {
+            background: #f0f0f0;
+        }
+    </style>
+</head>
+<body>
+    <h1>Debug Test</h1>
+    
+    <div class="game-card" onclick="testOpenModal()">
+        <h3>Test Game</h3>
+        <p>Click me to test modal</p>
+    </div>
+    
+    <div id="testModal" class="modal">
+        <div class="modal-content">
+            <h3>Test Modal</h3>
+            <p>This is a test modal</p>
+            <button onclick="testCloseModal()">Close</button>
+            <div id="testContainer">
+                <!-- Test content -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        console.log('Debug script loaded');
+        
+        function testOpenModal() {
+            console.log('Opening test modal');
+            document.getElementById('testModal').style.display = 'block';
+        }
+        
+        function testCloseModal() {
+            console.log('Closing test modal');
+            document.getElementById('testModal').style.display = 'none';
+        }
+        
+        // Test if we can access elements
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('DOM loaded');
+            console.log('Modal element:', document.getElementById('testModal'));
+        });
+    </script>
+</body>
+</html>

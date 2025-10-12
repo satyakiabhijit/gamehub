@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GameHub - 100+ Free Web Games</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <div class="logo">
+                <i class="fas fa-gamepad"></i>
+                <h1>GameHub</h1>
+            </div>
+            <nav class="nav">
+                <div class="search-container">
+                    <input type="text" id="searchInput" placeholder="Search games...">
+                    <i class="fas fa-search"></i>
+                </div>
+                <div class="time-tracker">
+                    <i class="fas fa-clock"></i>
+                    <span id="totalTime">0h 0m</span>
+                </div>
+            </nav>
+        </div>
+    </header>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="container">
+            <h2>Play 100+ Amazing Web Games</h2>
+            <p>No login required • Track your time • Pure fun!</p>
+            <div class="hero-stats">
+                <div class="stat">
+                    <span class="stat-number">100+</span>
+                    <span class="stat-label">Games</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-number" id="gamesPlayed">0</span>
+                    <span class="stat-label">Games Played</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-number" id="totalPlayTime">0h</span>
+                    <span class="stat-label">Total Time</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Game Categories -->
+    <section class="categories">
+        <div class="container">
+            <h3>Game Categories</h3>
+            <div class="category-filters">
+                <button class="filter-btn active" data-category="all">All Games</button>
+                <button class="filter-btn" data-category="puzzle">Puzzle</button>
+                <button class="filter-btn" data-category="arcade">Arcade</button>
+                <button class="filter-btn" data-category="strategy">Strategy</button>
+                <button class="filter-btn" data-category="casual">Casual</button>
+                <button class="filter-btn" data-category="logic">Logic</button>
+                <button class="filter-btn" data-category="card">Card Games</button>
+                <button class="filter-btn" data-category="math">Math</button>
+                <button class="filter-btn" data-category="word">Word Games</button>
+            </div>
+        </div>
+    </section>
+
+    <!-- Games Grid -->
+    <section class="games-section">
+        <div class="container">
+            <div class="games-grid" id="gamesGrid">
+                <!-- Games will be dynamically loaded here -->
+            </div>
+        </div>
+    </section>
+
+    <!-- Game Modal -->
+    <div class="game-modal" id="gameModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modalTitle">Game Title</h3>
+                <div class="modal-controls">
+                    <div class="game-timer">
+                        <i class="fas fa-clock"></i>
+                        <span id="gameTimer">00:00</span>
+                    </div>
+                    <button class="close-btn" id="closeModal">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="modal-body">
+                <div id="gameContainer">
+                    <!-- Game will be loaded here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <h4>GameHub</h4>
+                    <p>Your ultimate destination for free web games. No downloads, no registration required!</p>
+                </div>
+                <div class="footer-section">
+                    <h4>Categories</h4>
+                    <ul>
+                        <li>Puzzle Games</li>
+                        <li>Arcade Games</li>
+                        <li>Strategy Games</li>
+                        <li>Logic Games</li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h4>Features</h4>
+                    <ul>
+                        <li>100+ Games</li>
+                        <li>Time Tracking</li>
+                        <li>No Registration</li>
+                        <li>Mobile Friendly</li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h4>About</h4>
+                    <p>Built with ❤️ for gamers who love quick, fun, and accessible web games.</p>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2024 GameHub. All rights reserved. Made for pure gaming fun!</p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="gameEngine.js"></script>
+    <script src="games.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
