@@ -17,12 +17,12 @@ GameHub is a comprehensive, feature-rich gaming website offering 100+ carefully 
 
 ## 🚀 Live Demo
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fyourusername%2Fgamehub)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fsatyakiabhijit%2Fgamehub)
 
 **🌐 Live Site**: [game-hub-satyakiabhijit.vercel.app](https://game-hub-satyakiabhijit.vercel.app/)
 
 [![Vercel](https://img.shields.io/badge/Deployed%20on-Vercel-black?style=for-the-badge&logo=vercel)](https://vercel.com)
-[![GitHub](https://img.shields.io/badge/Source-GitHub-black?style=for-the-badge&logo=github)](https://github.com/yourusername/gamehub)
+[![GitHub](https://img.shields.io/badge/Source-GitHub-black?style=for-the-badge&logo=github)](https://github.com/satyakiabhijit/gamehub)
 [![MIT License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE)
 
 ## ✨ Features
