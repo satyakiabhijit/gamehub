@@ -1054,3 +1054,99 @@ button, .filter-btn, .game-btn, .close-btn {
         transition-duration: .01ms !important;
     }
 }
+
+
+/* Mobile game-layout fixes: prevent individual game boards from forcing modal overflow */
+#gameContainer,
+#gameContainer > * {
+    min-width: 0;
+    max-width: 100%;
+}
+#gameContainer > div {
+    box-sizing: border-box;
+}
+#gameContainer .word-search-layout {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) minmax(130px, 180px);
+    align-items: start;
+    gap: clamp(8px, 2vw, 20px) !important;
+    width: 100%;
+    max-width: 100%;
+    margin: 16px auto !important;
+}
+#gameContainer #word-search-grid {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    grid-template-columns: repeat(12, minmax(0, 1fr)) !important;
+    gap: 1px;
+    padding: clamp(3px, 1vw, 5px) !important;
+    aspect-ratio: 1;
+}
+#gameContainer #word-search-grid .ws-cell {
+    width: 100% !important;
+    height: auto !important;
+    min-width: 0;
+    aspect-ratio: 1;
+    font-size: clamp(8px, 2.2vw, 12px) !important;
+    line-height: 1;
+    padding: 0;
+}
+#gameContainer #word-search-list {
+    min-width: 0 !important;
+    width: 100%;
+    padding: clamp(8px, 2vw, 15px) !important;
+    overflow-wrap: anywhere;
+}
+#gameContainer #word-search-list h4 {
+    font-size: clamp(14px, 2.4vw, 20px);
+}
+#gameContainer #words-to-find > div {
+    padding: 6px 8px !important;
+    margin: 3px 0 !important;
+    overflow-wrap: anywhere;
+}
+#gameContainer canvas {
+    max-width: 100% !important;
+    height: auto;
+}
+#gameContainer table {
+    max-width: 100%;
+}
+#gameContainer input,
+#gameContainer select {
+    max-width: 100%;
+}
+@media (max-width: 600px) {
+    #gameContainer .word-search-layout {
+        grid-template-columns: minmax(0, 1fr);
+        justify-items: stretch;
+    }
+    #gameContainer #word-search-grid {
+        width: min(100%, 360px);
+        justify-self: center;
+    }
+    #gameContainer #word-search-list {
+        width: 100%;
+    }
+    #gameContainer #words-to-find {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 4px;
+    }
+    #gameContainer #words-to-find > div {
+        min-width: 0;
+        text-align: center;
+    }
+    #gameContainer .game-info h3 {
+        overflow-wrap: anywhere;
+    }
+}
+@media (max-width: 360px) {
+    #gameContainer #word-search-grid .ws-cell {
+        font-size: 8px !important;
+    }
+    #gameContainer .game-btn {
+        padding: 9px 12px;
+    }
+}
