@@ -2241,8 +2241,8 @@ function createMinesweeperBoard() {
             const cell = document.createElement('div');
             cell.className = 'ms-cell';
             cell.style.cssText = `
-                width: 25px; 
-                height: 25px; 
+                width: 100%; 
+                height: auto; 
                 background: #ccc; 
                 border: 2px outset #ccc;
                 display: flex;
@@ -2671,9 +2671,9 @@ function initWordSearch(container) {
             Found: <span id="ws-found">0</span> / <span id="ws-total">0</span> | 
             Time: <span id="ws-time">0</span>s
         </div>
-        <div style="display: flex; justify-content: center; gap: 20px; margin: 20px 0;">
+        <div class="word-search-layout">
             <div id="word-search-grid" style="display: grid; gap: 1px; background: #333; padding: 5px;"></div>
-            <div id="word-search-list" style="background: #f9f9f9; padding: 15px; border-radius: 10px; min-width: 150px;">
+            <div id="word-search-list" style="background: #f9f9f9; padding: 15px; border-radius: 10px;">
                 <h4>Find these words:</h4>
                 <div id="words-to-find"></div>
             </div>
@@ -2778,7 +2778,7 @@ function placeWordInGrid(word) {
 
 function createWordSearchGrid() {
     const grid = document.getElementById('word-search-grid');
-    grid.style.gridTemplateColumns = `repeat(${wordSearch.size}, 25px)`;
+    grid.style.gridTemplateColumns = `repeat(${wordSearch.size}, minmax(0, 1fr))`;
     grid.innerHTML = '';
     
     for (let row = 0; row < wordSearch.size; row++) {
