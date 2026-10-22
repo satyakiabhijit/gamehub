@@ -1150,3 +1150,34 @@ button, .filter-btn, .game-btn, .close-btn {
         padding: 9px 12px;
     }
 }
+
+/* Correct mobile modal flow: the game container must stack game sections vertically */
+@media (max-width: 600px) {
+    #gameContainer {
+        display: block !important;
+        width: 100%;
+        min-height: 0;
+        height: auto;
+    }
+    #gameContainer > * {
+        width: 100%;
+    }
+    #gameContainer .word-search-layout {
+        display: grid !important;
+        grid-template-columns: minmax(0, 1fr) !important;
+        gap: 12px !important;
+        margin: 12px auto !important;
+    }
+    #gameContainer .word-search-layout > #word-search-grid {
+        width: min(100%, 360px);
+        justify-self: center;
+    }
+    #gameContainer #word-search-list {
+        width: 100%;
+        max-width: 360px;
+        justify-self: center;
+    }
+    #gameContainer #words-to-find {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
