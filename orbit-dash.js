@@ -233,13 +233,14 @@
         hold(rightBtn, 1);
 
         // Release input and animation work when the modal/game is closed.
+        const thisGame = game;
         const observer = new MutationObserver(() => {
             if (!container.isConnected || !document.getElementById('gameModal')?.contains(container)) {
-                cancelAnimationFrame(game.raf);
+                cancelAnimationFrame(thisGame.raf);
                 document.removeEventListener('keydown', onKeyDown);
                 document.removeEventListener('keyup', onKeyUp);
                 observer.disconnect();
-                game = null;
+                if (game === thisGame) game = null;
             }
         });
         observer.observe(document.body, { childList: true, subtree: true });
